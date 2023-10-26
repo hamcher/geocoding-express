@@ -1,11 +1,18 @@
 const express = require("express");
 const https = require('https');
 const axios = require('axios');
+const fs = require('fs');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+// const fetch = require('node-fetch');
+// import fetch from 'node-fetch'
+
 
 
 const app = express();
 const port = process.env.PORT || 3001;
 
+
+// const httpsServer = https.createServer(credentials, app);
 
 
 function generateRequestId() {
@@ -23,16 +30,14 @@ const httpsAgent = new https.Agent({
 	rejectUnauthorized: false, // add this if you want to ignore unauthorized SSL certificates
 	secureProtocol: 'TLSv1_2_method' // or 'TLSv1_3_method' based on your requirements
 });
-  
+
+
 
 app.get("/geocoding", async (req, res) => {
 	const query = req.query.query;
 	const token = req.query.token;
-	const host = req.query.host;
-	const port = req.query.port;
-	const username = req.query.username;
-	const password = req.query.password;
-	if (!query || !token || !host || !port) {
+	const proxy = req.query.proxy;
+	if (!query || !token) {
 		return res.json({
 			type: 'error',
 			status: 403,
@@ -41,15 +46,14 @@ app.get("/geocoding", async (req, res) => {
 	}
 	try {
 
-		const proxy = { host, port }
-		if (username && password) {
-			proxy.auth = {
-				username,
-				password
-			}
-		}
-		console.log(proxy);
+		const axiosInstance = axios.create({
+			httpsAgent: proxy ? new HttpsProxyAgent(proxy) : undefined 
+		});
+
+
+		console.log('proxy', proxy ? proxy : ' -x- not proxy -x-');
 		const url = 'https://www.google.com/search'
+		// const url = 'https://api.ipify.org'
 		const params = {
 			gl: "dz",
 			tbm: "map",
@@ -57,7 +61,8 @@ app.get("/geocoding", async (req, res) => {
 			nfpr: 1,
 			pb: token
 		}
-		const response = await axios.get(url, { params, proxy, httpsAgent })
+		const response = await axiosInstance.get(url, { params })
+		
 		const requestId = generateRequestId()
 		if (response.status === 200) {
 			const content = response.data.replace(')]}\'\n', '');
